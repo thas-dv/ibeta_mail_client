@@ -1,10 +1,13 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:ibeta_mail_client/features/accounts/provider/account_providers.dart';
+import 'package:ibeta_mail_client/features/compose/services/smtp_service.dart';
+import 'package:ibeta_mail_client/features/mail/providers/mail_providers.dart';
 
 
-import '../services/smtp_service.dart';
 
-final smtpServiceProvider = Provider((ref) => SmtpService());
+final smtpServiceProvider = Provider(
+  (ref) => SmtpService(ref.watch(mailServiceProvider)),
+);
 final composeControllerProvider = AsyncNotifierProvider<ComposeController, void>(
   ComposeController.new,
 );
@@ -20,11 +23,11 @@ class ComposeController extends AsyncNotifier<void> {
   }) async {
     final account = ref.read(selectedAccountProvider);
     if (account == null) {
-      throw Exception('Ajoutez un compte avant d’envoyer un email.');
+      throw StateError('Aucun compte actif.');
     }
     state = const AsyncLoading();
     state = await AsyncValue.guard(() async {
-      await ref.watch(smtpServiceProvider).sendMail(
+ await ref.read(smtpServiceProvider).sendMail(
             account: account,
             to: to,
             subject: subject,

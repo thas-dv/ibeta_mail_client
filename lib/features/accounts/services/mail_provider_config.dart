@@ -17,56 +17,36 @@ class MailProviderConfig {
 }
 
 class MailProviderResolver {
-  static MailProviderConfig fromEmail(String email) {
-    final domain = email.split('@').last.toLowerCase();
-    if (domain.contains('gmail.')) {
-      return const MailProviderConfig(
-        imapHost: 'imap.gmail.com',
-        imapPort: 993,
-        smtpHost: 'smtp.gmail.com',
-        smtpPort: 587,
-      );
-    }
-    if (domain.contains('outlook.') || domain.contains('hotmail.') || domain.contains('live.')) {
-      return const MailProviderConfig(
-        imapHost: 'outlook.office365.com',
-        imapPort: 993,
-        smtpHost: 'smtp.office365.com',
-        smtpPort: 587,
-      );
-    }
-    if (domain.contains('yahoo.')) {
-      return const MailProviderConfig(
-        imapHost: 'imap.mail.yahoo.com',
-        imapPort: 993,
-        smtpHost: 'smtp.mail.yahoo.com',
-        smtpPort: 587,
-      );
-    }
-
-    return MailProviderConfig(
-      imapHost: 'imap.$domain',
+   static MailProviderConfig gmail() {
+    return const MailProviderConfig(
+      imapHost: 'imap.gmail.com',
       imapPort: 993,
-      smtpHost: 'smtp.$domain',
+      smtpHost: 'smtp.gmail.com',
       smtpPort: 587,
     );
   }
 
-  static MailAccount buildAccount({
-    required String email,
+   static MailAccount buildGmailAccount({
+     required String email,
     required String displayName,
-    required String password,
+   required String accessToken,
+    required String? refreshToken,
+    String? photoUrl,
+    String? serverAuthCode,
   }) {
-    final config = fromEmail(email);
+    final config = gmail();
     return MailAccount(
-      id: email,
+      id: email.toLowerCase(),
       email: email,
       displayName: displayName.isEmpty ? email.split('@').first : displayName,
       imapHost: config.imapHost,
       imapPort: config.imapPort,
       smtpHost: config.smtpHost,
       smtpPort: config.smtpPort,
-      password: password,
+    accessToken: accessToken,
+      refreshToken: refreshToken,
+      photoUrl: photoUrl,
+      serverAuthCode: serverAuthCode,
       useSsl: config.useSsl,
     );
   }

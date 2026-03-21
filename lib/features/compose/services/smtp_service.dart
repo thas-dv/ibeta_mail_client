@@ -1,31 +1,25 @@
-import 'package:mailer/mailer.dart';
-import 'package:mailer/smtp_server.dart';
+import 'package:ibeta_mail_client/features/accounts/models/mail_account.dart';
 
-import '../../accounts/models/mail_account.dart';
+import '../../mail/services/mail_service.dart';
+
 
 class SmtpService {
+    SmtpService(this._mailService);
+
+  final MailService _mailService;
   Future<void> sendMail({
     required MailAccount account,
     required String to,
     required String subject,
     required String body,
-  }) async {
-    final smtpServer = SmtpServer(
-      account.smtpHost,
-      port: account.smtpPort,
-      username: account.email,
-      password: account.password,
-      ssl: false,
-      allowInsecure: false,
-      ignoreBadCertificate: false,
+}) {
+    return _mailService.sendMessage(
+      account: account,
+      to: to,
+      subject: subject,
+      body: body,
     );
 
-    final message = Message()
-      ..from = Address(account.email, account.displayName)
-      ..recipients.add(to)
-      ..subject = subject
-      ..text = body;
 
-    await send(message, smtpServer);
   }
 }

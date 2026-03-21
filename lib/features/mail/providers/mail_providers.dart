@@ -9,7 +9,11 @@ import '../models/mail_message.dart';
 import '../services/mail_cache_service.dart';
 import '../services/mail_service.dart';
 
-final mailServiceProvider = Provider((ref) => MailService());
+final mailServiceProvider = Provider(
+  (ref) => MailService(
+    refreshToken: (account) => ref.read(accountsProvider.notifier).refreshAccountToken(account),
+  ),
+);
 final mailCacheServiceProvider = Provider((ref) => MailCacheService());
 
 final inboxControllerProvider = AsyncNotifierProvider<InboxController, List<MailMessage>>(
@@ -92,10 +96,12 @@ class InboxController extends AsyncNotifier<List<MailMessage>> {
       return;
     }
     await ref.watch(mailServiceProvider).markAsRead(account, message.uid, read: !message.isRead);
-    state = AsyncData([
+    final updated = [
       for (final item in state.value ?? const <MailMessage>[])
         if (item.uid == message.uid) item.copyWith(isRead: !item.isRead) else item,
-    ]);
+    ];
+      state = AsyncData(updated);
+    await ref.watch(mailCacheServiceProvider).saveInbox(account.id, updated);
   }
 
   Future<void> deleteMessage(MailMessage message) async {
@@ -104,9 +110,11 @@ class InboxController extends AsyncNotifier<List<MailMessage>> {
       return;
     }
     await ref.watch(mailServiceProvider).deleteMessage(account, message.uid);
-    state = AsyncData([
+     final updated = [
       for (final item in state.value ?? const <MailMessage>[])
         if (item.uid != message.uid) item,
-    ]);
+    ];
+     state = AsyncData(updated);
+    await ref.watch(mailCacheServiceProvider).saveInbox(account.id, updated);
   }
 }

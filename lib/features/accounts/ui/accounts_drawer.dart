@@ -19,7 +19,7 @@ class AccountsDrawer extends ConsumerWidget {
           children: [
             ListTile(
               title: const Text('iBeta Mail'),
-              subtitle: const Text('Client IMAP + SMTP multi-comptes'),
+               subtitle: const Text('Gmail OAuth2 multi-comptes'),
               trailing: IconButton(
                 icon: Icon(themeMode == ThemeMode.dark ? Icons.dark_mode : Icons.light_mode),
                 onPressed: () {
@@ -35,14 +35,33 @@ class AccountsDrawer extends ConsumerWidget {
                   children: [
                     for (final account in items)
                       ListTile(
-                        leading: CircleAvatar(child: Text(account.email.characters.first.toUpperCase())),
+                   leading: CircleAvatar(
+                          backgroundImage: account.photoUrl != null ? NetworkImage(account.photoUrl!) : null,
+                          child: account.photoUrl == null
+                              ? Text(account.email.characters.first.toUpperCase())
+                              : null,
+                        ),
                         title: Text(account.displayName),
                         subtitle: Text(account.email),
                         selected: selected?.id == account.id,
+                          trailing: IconButton(
+                          icon: const Icon(Icons.delete_outline),
+                          tooltip: 'Retirer ce compte localement',
+                          onPressed: () async {
+                            await ref.read(accountsProvider.notifier).removeAccount(account.id);
+                          },
+                        ),
                         onTap: () async {
                           await ref.read(accountsProvider.notifier).selectAccount(account.id);
                           if (context.mounted) Navigator.of(context).pop();
                         },
+                      ),
+                       if (items.isEmpty)
+                      const Padding(
+                        padding: EdgeInsets.all(24),
+                        child: Text(
+                          'Ajoutez un compte Gmail pour démarrer. La suppression dans cette liste retire uniquement le compte localement.',
+                        ),
                       ),
                   ],
                 ),

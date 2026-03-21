@@ -9,7 +9,10 @@ class MailAccount {
     required this.imapPort,
     required this.smtpHost,
     required this.smtpPort,
-    required this.password,
+   required this.accessToken,
+    required this.refreshToken,
+    this.photoUrl,
+    this.serverAuthCode,
     this.useSsl = true,
   });
 
@@ -20,7 +23,10 @@ class MailAccount {
   final int imapPort;
   final String smtpHost;
   final int smtpPort;
-  final String password;
+  final String accessToken;
+  final String? refreshToken;
+  final String? photoUrl;
+  final String? serverAuthCode;
   final bool useSsl;
 
   MailAccount copyWith({
@@ -31,7 +37,10 @@ class MailAccount {
     int? imapPort,
     String? smtpHost,
     int? smtpPort,
-    String? password,
+    String? accessToken,
+    String? refreshToken,
+    String? photoUrl,
+    String? serverAuthCode,
     bool? useSsl,
   }) {
     return MailAccount(
@@ -42,7 +51,10 @@ class MailAccount {
       imapPort: imapPort ?? this.imapPort,
       smtpHost: smtpHost ?? this.smtpHost,
       smtpPort: smtpPort ?? this.smtpPort,
-      password: password ?? this.password,
+ accessToken: accessToken ?? this.accessToken,
+      refreshToken: refreshToken ?? this.refreshToken,
+      photoUrl: photoUrl ?? this.photoUrl,
+      serverAuthCode: serverAuthCode ?? this.serverAuthCode,
       useSsl: useSsl ?? this.useSsl,
     );
   }
@@ -55,10 +67,16 @@ class MailAccount {
         'imapPort': imapPort,
         'smtpHost': smtpHost,
         'smtpPort': smtpPort,
+         'photoUrl': photoUrl,
+        'serverAuthCode': serverAuthCode,
         'useSsl': useSsl,
       };
 
-  factory MailAccount.fromJson(Map<String, dynamic> json, {required String password}) {
+  factory MailAccount.fromJson(
+    Map<String, dynamic> json, {
+    required String accessToken,
+    required String? refreshToken,
+  }) {
     return MailAccount(
       id: json['id'] as String,
       email: json['email'] as String,
@@ -67,8 +85,11 @@ class MailAccount {
       imapPort: json['imapPort'] as int,
       smtpHost: json['smtpHost'] as String,
       smtpPort: json['smtpPort'] as int,
+        photoUrl: json['photoUrl'] as String?,
+      serverAuthCode: json['serverAuthCode'] as String?,
       useSsl: json['useSsl'] as bool? ?? true,
-      password: password,
+  accessToken: accessToken,
+      refreshToken: refreshToken,
     );
   }
 

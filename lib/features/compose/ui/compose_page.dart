@@ -54,13 +54,13 @@ class _ComposePageState extends ConsumerState<ComposePage> {
             children: [
               TextFormField(
                 controller: _toController,
-                decoration: const InputDecoration(labelText: 'To'),
+                decoration: const InputDecoration(labelText: 'Destinataire'),
                 validator: (value) => value != null && value.contains('@') ? null : 'Destinataire invalide',
               ),
               const SizedBox(height: 12),
               TextFormField(
                 controller: _subjectController,
-                decoration: const InputDecoration(labelText: 'Subject'),
+                 decoration: const InputDecoration(labelText: 'Sujet'),
               ),
               const SizedBox(height: 12),
               Expanded(
@@ -71,7 +71,7 @@ class _ComposePageState extends ConsumerState<ComposePage> {
                   expands: true,
                   textAlignVertical: TextAlignVertical.top,
                   decoration: const InputDecoration(
-                    labelText: 'Body',
+                   labelText: 'Message',
                     alignLabelWithHint: true,
                     border: OutlineInputBorder(),
                   ),

@@ -10,19 +10,10 @@ class AddAccountSheet extends ConsumerStatefulWidget {
 }
 
 class _AddAccountSheetState extends ConsumerState<AddAccountSheet> {
-  final _formKey = GlobalKey<FormState>();
-  final _emailController = TextEditingController();
-  final _nameController = TextEditingController();
-  final _passwordController = TextEditingController();
+
   bool _loading = false;
 
-  @override
-  void dispose() {
-    _emailController.dispose();
-    _nameController.dispose();
-    _passwordController.dispose();
-    super.dispose();
-  }
+ 
 
   @override
   Widget build(BuildContext context) {
@@ -33,80 +24,60 @@ class _AddAccountSheetState extends ConsumerState<AddAccountSheet> {
         top: 24,
         bottom: MediaQuery.of(context).viewInsets.bottom + 24,
       ),
-      child: Form(
-        key: _formKey,
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Text(
-              'Ajouter un compte',
-              style: Theme.of(context).textTheme.headlineSmall,
-            ),
-            const SizedBox(height: 16),
-            TextFormField(
-              controller: _emailController,
-              decoration: const InputDecoration(labelText: 'Adresse email'),
-              validator: (value) => value != null && value.contains('@')
-                  ? null
-                  : 'Email invalide',
-            ),
-            const SizedBox(height: 12),
-            TextFormField(
-              controller: _nameController,
-              decoration: const InputDecoration(labelText: 'Nom affiché'),
-            ),
-            const SizedBox(height: 12),
-            TextFormField(
-              controller: _passwordController,
-              obscureText: true,
-              decoration: const InputDecoration(
-                labelText: 'Mot de passe / mot de passe applicatif',
-              ),
-              validator: (value) => value != null && value.isNotEmpty
-                  ? null
-                  : 'Mot de passe requis',
-            ),
-            const SizedBox(height: 16),
-            FilledButton.icon(
-              onPressed: _loading
+       child: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            'Ajouter un compte Gmail',
+            style: Theme.of(context).textTheme.headlineSmall,
+          ),
+          const SizedBox(height: 12),
+          const Text(
+            'Connexion sécurisée Google OAuth2. Aucun mot de passe Gmail n’est stocké dans l’application.',
+          ),
+          const SizedBox(height: 24),
+          Card(
+            child: ListTile(
+              leading: const CircleAvatar(child: Icon(Icons.alternate_email)),
+              title: const Text('Continuer avec Google'),
+              subtitle: const Text('IMAP/SMTP via XOAUTH2 avec token OAuth2'),
+              trailing: _loading
+                  ? const SizedBox.square(
+                      dimension: 18,
+                      child: CircularProgressIndicator(strokeWidth: 2),
+                    )
+                  : const Icon(Icons.chevron_right),
+              onTap: _loading
+
                   ? null
                   : () async {
-                      if (!_formKey.currentState!.validate()) {
-                        return;
-                      }
+                     
                       setState(() => _loading = true);
                       try {
-                        await ref
-                            .read(accountsProvider.notifier)
-                            .addAccount(
-                              email: _emailController.text.trim(),
-                              displayName: _nameController.text.trim(),
-                              password: _passwordController.text,
-                            );
-                        if (mounted) Navigator.of(context).pop();
+                         await ref.read(accountsProvider.notifier).addAccountWithGoogle();
+                        if (mounted) {
+                          Navigator.of(context).pop();
+                        }
                       } catch (error) {
-                        if (!mounted) return;
+                        if (!mounted) {
+                          return;
+                        }
                         ScaffoldMessenger.of(context).showSnackBar(
                           SnackBar(
-                            content: Text(
-                              'Impossible d’ajouter le compte: $error',
-                            ),
+                             content: Text('Impossible d’ajouter le compte Google : $error'),
                           ),
                         );
                       } finally {
                         if (mounted) setState(() => _loading = false);
                       }
                     },
-              icon: _loading
-                  ? const SizedBox.square(
-                      dimension: 16,
-                      child: CircularProgressIndicator(strokeWidth: 2),
-                    )
-                  : const Icon(Icons.alternate_email),
-              label: Text(_loading ? 'Connexion…' : 'Ajouter le compte'),
-            ),
-          ],
-        ),
+               ),),
+          const SizedBox(height: 16),
+          const Text(
+            'Astuce : configurez vos identifiants OAuth Google via --dart-define GOOGLE_OAUTH_CLIENT_ID et GOOGLE_OAUTH_SERVER_CLIENT_ID.',
+          )
+        ],
       ),
     );
   }

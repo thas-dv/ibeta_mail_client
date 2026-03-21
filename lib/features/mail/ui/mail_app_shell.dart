@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:ibeta_mail_client/features/accounts/provider/account_providers.dart';
 
-
 import '../../accounts/ui/accounts_drawer.dart';
 import '../../compose/ui/compose_page.dart';
 import '../providers/mail_providers.dart';
@@ -31,7 +30,7 @@ class _MailAppShellState extends ConsumerState<MailAppShell> {
           children: [
             const Text('Boîte de réception'),
             Text(
-              account?.email ?? 'Ajoutez un compte',
+              account?.email ?? 'Ajoutez un compte Gmail',
               style: Theme.of(context).textTheme.labelMedium,
             ),
           ],
@@ -41,26 +40,30 @@ class _MailAppShellState extends ConsumerState<MailAppShell> {
         index: _index,
         children: [
           RefreshIndicator(
-            onRefresh: () => ref.read(inboxControllerProvider.notifier).refresh(),
+            onRefresh: () =>
+                ref.read(inboxControllerProvider.notifier).refresh(),
             child: inbox.when(
               data: (messages) {
                 if (account == null) {
                   return const _EmptyState(
                     icon: Icons.account_circle_outlined,
-                    title: 'Aucun compte configuré',
-                    subtitle: 'Ajoutez un compte Gmail, Outlook, Yahoo ou IMAP personnalisé depuis le menu.',
+                    title: 'Aucun compte Gmail connecté',
+                    subtitle:
+                        'Ajoutez un compte via Google OAuth2 pour synchroniser vos emails sans mot de passe.',
                   );
                 }
                 if (messages.isEmpty) {
                   return const _EmptyState(
                     icon: Icons.mark_email_read_outlined,
                     title: 'Aucun message en cache',
-                    subtitle: 'Tirez pour rafraîchir afin de charger les messages IMAP.',
+                    subtitle:
+                        'Tirez pour rafraîchir afin de charger les messages Gmail via IMAP XOAUTH2.',
                   );
                 }
                 return NotificationListener<ScrollEndNotification>(
                   onNotification: (notification) {
-                    if (notification.metrics.pixels >= notification.metrics.maxScrollExtent - 120) {
+                    if (notification.metrics.pixels >=
+                        notification.metrics.maxScrollExtent - 120) {
                       ref.read(inboxControllerProvider.notifier).loadMore();
                     }
                     return false;
@@ -72,8 +75,12 @@ class _MailAppShellState extends ConsumerState<MailAppShell> {
                       final message = messages[index];
                       return MailListTile(
                         message: message,
-                        onToggleRead: () => ref.read(inboxControllerProvider.notifier).toggleRead(message),
-                        onDelete: () => ref.read(inboxControllerProvider.notifier).deleteMessage(message),
+                        onToggleRead: () => ref
+                            .read(inboxControllerProvider.notifier)
+                            .toggleRead(message),
+                        onDelete: () => ref
+                            .read(inboxControllerProvider.notifier)
+                            .deleteMessage(message),
                       );
                     },
                   ),
@@ -94,14 +101,20 @@ class _MailAppShellState extends ConsumerState<MailAppShell> {
         selectedIndex: _index,
         onDestinationSelected: (value) => setState(() => _index = value),
         destinations: const [
-          NavigationDestination(icon: Icon(Icons.inbox_outlined), selectedIcon: Icon(Icons.inbox), label: 'Inbox'),
-          NavigationDestination(icon: Icon(Icons.settings_outlined), selectedIcon: Icon(Icons.settings), label: 'Réglages'),
+          NavigationDestination(
+            icon: Icon(Icons.inbox_outlined),
+            selectedIcon: Icon(Icons.inbox),
+            label: 'Inbox',
+          ),
+           NavigationDestination(icon: Icon(Icons.settings_outlined), selectedIcon: Icon(Icons.settings), label: 'Paramètres'),
         ],
       ),
       floatingActionButton: FloatingActionButton.extended(
-        onPressed: () {
-          Navigator.of(context).push(MaterialPageRoute(builder: (_) => const ComposePage()));
-        },
+         onPressed: account == null
+            ? null
+            : () {
+                Navigator.of(context).push(MaterialPageRoute(builder: (_) => const ComposePage()));
+              },
         icon: const Icon(Icons.edit_outlined),
         label: const Text('Composer'),
       ),
@@ -115,6 +128,7 @@ class _SettingsPage extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final account = ref.watch(selectedAccountProvider);
+      final accounts = ref.watch(accountsProvider).value ?? const [];
     final themeMode = ref.watch(themeModeProvider);
 
     return ListView(
@@ -127,12 +141,26 @@ class _SettingsPage extends ConsumerWidget {
           ),
         ),
         Card(
+          child: ListTile(
+            title: const Text('Comptes locaux'),
+            subtitle: Text('${accounts.length} compte(s) Gmail enregistrés sur cet appareil'),
+          ),
+        ),
+        Card(
+          child: const ListTile(
+            title: Text('Suppression locale'),
+            subtitle: Text('Retirer un compte dans l’application ne supprime jamais le compte Gmail réel ni les emails côté serveur.'),
+          ),
+        ),
+        Card(
           child: SwitchListTile(
             value: themeMode == ThemeMode.dark,
             title: const Text('Dark mode'),
             subtitle: const Text('Bascule entre les thèmes clair et sombre.'),
             onChanged: (value) {
-              ref.read(themeModeProvider.notifier).state = value ? ThemeMode.dark : ThemeMode.light;
+              ref.read(themeModeProvider.notifier).state = value
+                  ? ThemeMode.dark
+                  : ThemeMode.light;
             },
           ),
         ),

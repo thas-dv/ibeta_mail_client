@@ -36,10 +36,12 @@ dependencies:
   cupertino_icons: ^1.0.8
   flutter_riverpod: ^3.0.3
   mailer: ^7.1.0
-  enough_mail: ^2.1.7
+ 
   flutter_secure_storage: ^10.0.0
   shared_preferences: ^2.5.3
   intl: ^0.20.2
+  google_sign_in: ^7.2.0
+  enough_mail: ^2.1.6
 dev_dependencies:
   flutter_test:
     sdk: flutter

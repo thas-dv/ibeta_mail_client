@@ -19,10 +19,19 @@ class AccountStorageService {
     final accounts = <MailAccount>[];
     for (final entry in raw) {
       final data = jsonDecode(entry) as Map<String, dynamic>;
-      final password = await _secureStorage.read(key: 'mail_password_${data['id']}');
-      if (password != null) {
-        accounts.add(MailAccount.fromJson(data, password: password));
+final accountId = data['id'] as String;
+      final accessToken = await _secureStorage.read(key: 'mail_access_token_$accountId');
+      if (accessToken == null) {
+        continue;
       }
+        final refreshToken = await _secureStorage.read(key: 'mail_refresh_token_$accountId');
+      accounts.add(
+        MailAccount.fromJson(
+          data,
+          accessToken: accessToken,
+          refreshToken: refreshToken,
+        ),
+      );
     }
     return accounts;
   }
@@ -35,12 +44,23 @@ class AccountStorageService {
     );
     for (final account in accounts) {
       await _secureStorage.write(
-        key: 'mail_password_${account.id}',
-        value: account.password,
+        key: 'mail_access_token_${account.id}',
+        value: account.accessToken,
+      );
+      await _secureStorage.write(
+        key: 'mail_refresh_token_${account.id}',
+        value: account.refreshToken,
       );
     }
   }
-
+ Future<void> deleteAccount(String accountId) async {
+    final accounts = await loadAccounts();
+    final filtered = accounts.where((account) => account.id != accountId).toList();
+    await saveAccounts(filtered);
+    await _secureStorage.delete(key: 'mail_access_token_$accountId');
+    await _secureStorage.delete(key: 'mail_refresh_token_$accountId');
+  }
+  
   Future<String?> loadSelectedAccountId() async {
     final prefs = await SharedPreferences.getInstance();
     return prefs.getString(_selectedAccountKey);
