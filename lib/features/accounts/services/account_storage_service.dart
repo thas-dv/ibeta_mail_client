@@ -14,17 +14,21 @@ class AccountStorageService {
 
   Future<List<MailAccount>> loadAccounts() async {
     final prefs = await SharedPreferences.getInstance();
-    final raw = prefs.getStringList(_accountsKey) ?? const [];
+    final raw = prefs.getStringList(_accountsKey) ?? const <String>[];
 
     final accounts = <MailAccount>[];
     for (final entry in raw) {
-      final data = jsonDecode(entry) as Map<String, dynamic>;
-final accountId = data['id'] as String;
-      final accessToken = await _secureStorage.read(key: 'mail_access_token_$accountId');
+      final data = jsonDecode(entry) as Map<String, dynamic>; 
+      final accountId = data['id'] as String;
+      final accessToken = await _secureStorage.read(
+        key: 'mail_access_token_$accountId',
+      );
       if (accessToken == null) {
         continue;
       }
-        final refreshToken = await _secureStorage.read(key: 'mail_refresh_token_$accountId');
+        final refreshToken = await _secureStorage.read(
+        key: 'mail_refresh_token_$accountId',
+      );
       accounts.add(
         MailAccount.fromJson(
           data,
@@ -38,6 +42,11 @@ final accountId = data['id'] as String;
 
   Future<void> saveAccounts(List<MailAccount> accounts) async {
     final prefs = await SharedPreferences.getInstance();
+      final previous = prefs.getStringList(_accountsKey) ?? const <String>[];
+    final previousIds = previous
+        .map((entry) => (jsonDecode(entry) as Map<String, dynamic>)['id'] as String)
+        .toSet();
+    final nextIds = accounts.map((account) => account.id).toSet();
     await prefs.setStringList(
       _accountsKey,
       accounts.map((account) => account.serialize()).toList(),
@@ -52,15 +61,19 @@ final accountId = data['id'] as String;
         value: account.refreshToken,
       );
     }
+      for (final removedId in previousIds.difference(nextIds)) {
+      await _secureStorage.delete(key: 'mail_access_token_$removedId');
+      await _secureStorage.delete(key: 'mail_refresh_token_$removedId');
+    }
   }
- Future<void> deleteAccount(String accountId) async {
+Future<void> deleteAccount(String accountId) async {
     final accounts = await loadAccounts();
     final filtered = accounts.where((account) => account.id != accountId).toList();
     await saveAccounts(filtered);
     await _secureStorage.delete(key: 'mail_access_token_$accountId');
     await _secureStorage.delete(key: 'mail_refresh_token_$accountId');
   }
-  
+
   Future<String?> loadSelectedAccountId() async {
     final prefs = await SharedPreferences.getInstance();
     return prefs.getString(_selectedAccountKey);

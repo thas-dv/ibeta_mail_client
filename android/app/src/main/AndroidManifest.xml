@@ -1,4 +1,6 @@
-<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+    package="com.example.ibeta_mail_client">
+    <uses-permission android:name="android.permission.INTERNET" />
     <application
         android:label="ibeta_mail_client"
         android:name="${applicationName}"

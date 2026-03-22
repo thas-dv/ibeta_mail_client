@@ -15,7 +15,7 @@ class MailCacheService {
     return data
         .map(
           (entry) => MailMessage(
-            uid: entry['uid'] as int,
+            uid: entry['uid'] as String,
             subject: entry['subject'] as String,
             from: entry['from'] as String,
             preview: entry['preview'] as String,

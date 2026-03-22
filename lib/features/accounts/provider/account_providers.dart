@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_riverpod/legacy.dart';
 
+
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 
 import '../models/mail_account.dart';
@@ -15,7 +16,11 @@ final secureStorageProvider = Provider((ref) => const FlutterSecureStorage());
 final accountStorageProvider = Provider(
   (ref) => AccountStorageService(ref.watch(secureStorageProvider)),
 );
-final googleOAuthServiceProvider = Provider((ref) => GoogleOAuthService());
+final googleOAuthServiceProvider = Provider<GoogleOAuthService>((ref) {
+  final service = GoogleOAuthService();
+  ref.onDispose(service.dispose);
+  return service;
+});
 final accountsProvider = AsyncNotifierProvider<AccountsNotifier, List<MailAccount>>(
   AccountsNotifier.new,
 );
@@ -37,23 +42,24 @@ final selectedAccountProvider = Provider<MailAccount?>((ref) {
 class AccountsNotifier extends AsyncNotifier<List<MailAccount>> {
   @override
   Future<List<MailAccount>> build() async {
-     await ref.read(googleOAuthServiceProvider).initialize();
-    final accounts = await ref.watch(accountStorageProvider).loadAccounts();
-    final selectedId = await ref.watch(accountStorageProvider).loadSelectedAccountId();
+    await ref.read(googleOAuthServiceProvider).initialize();
+    final storage = ref.watch(accountStorageProvider);
+    final accounts = await storage.loadAccounts();
+    final selectedId = await storage.loadSelectedAccountId();
     ref.read(selectedAccountIdProvider.notifier).state = selectedId;
     return accounts;
   }
 
-   Future<void> addAccountWithGoogle() async {
-    final current = state.value ?? <MailAccount>[];
-   final account = await ref.read(googleOAuthServiceProvider).authenticate();
-    
-    final updated = [...current.where((entry) => entry.id != account.id), account];
-    state = AsyncData(updated);
-    await ref.watch(accountStorageProvider).saveAccounts(updated);
-    await selectAccount(account.id);
+Future<void> addAccountWithGoogle() async {
+    final account = await ref.read(googleOAuthServiceProvider).authenticate();
+    await _upsertAccount(account);
   }
-    Future<MailAccount> refreshAccountToken(MailAccount account) async {
+     Future<void> finalizeWebGoogleSignIn() async {
+    final account = await ref.read(googleOAuthServiceProvider).completeWebAuthentication();
+    await _upsertAccount(account);
+  }
+
+  Future<MailAccount> refreshAccountToken(MailAccount account) async {
     final refreshed = await ref.read(googleOAuthServiceProvider).refreshAccount(account);
     final current = state.value ?? const <MailAccount>[];
     final updated = [
@@ -79,5 +85,12 @@ class AccountsNotifier extends AsyncNotifier<List<MailAccount>> {
   Future<void> selectAccount(String? accountId) async {
     ref.read(selectedAccountIdProvider.notifier).state = accountId;
     await ref.watch(accountStorageProvider).saveSelectedAccountId(accountId);
+  }
+    Future<void> _upsertAccount(MailAccount account) async {
+    final current = state.value ?? <MailAccount>[];
+    final updated = [...current.where((entry) => entry.id != account.id), account];
+    state = AsyncData(updated);
+    await ref.watch(accountStorageProvider).saveAccounts(updated);
+    await selectAccount(account.id);
   }
 }

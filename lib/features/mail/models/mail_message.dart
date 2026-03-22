@@ -8,7 +8,7 @@ class MailMessage {
     required this.isRead,
   });
 
-  final int uid;
+  final String uid;
   final String subject;
   final String from;
   final String preview;
@@ -16,7 +16,7 @@ class MailMessage {
   final bool isRead;
 
   MailMessage copyWith({
-    int? uid,
+    String? uid,
     String? subject,
     String? from,
     String? preview,
