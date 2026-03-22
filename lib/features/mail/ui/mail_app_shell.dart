@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:ibeta_mail_client/features/accounts/provider/account_providers.dart';
-
+import 'package:intl/intl.dart';
+import '../../compose/providers/saved_contacts_provider.dart';
+import '../models/mail_message.dart';
 import '../../accounts/ui/accounts_drawer.dart';
 import '../../compose/ui/compose_page.dart';
 import '../providers/mail_providers.dart';
@@ -28,7 +30,7 @@ class _MailAppShellState extends ConsumerState<MailAppShell> {
         title: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            const Text('Boîte de réception'),
+             Text(_index == 0 ? 'Boîte de réception' : 'Paramètres'),
             Text(
               account?.email ?? 'Ajoutez un compte Gmail',
               style: Theme.of(context).textTheme.labelMedium,
@@ -75,6 +77,22 @@ class _MailAppShellState extends ConsumerState<MailAppShell> {
                       final message = messages[index];
                       return MailListTile(
                         message: message,
+                         onOpen: () async {
+                          await ref
+                              .read(inboxControllerProvider.notifier)
+                              .openMessage(message);
+                          if (!context.mounted) {
+                            return;
+                          }
+                          await Navigator.of(context).push(
+                            MaterialPageRoute<void>(
+                              builder: (_) => MailMessageDetailPage(
+                                messageUid: message.uid,
+                              ),
+                            ),
+                          );
+                        },
+
                         onToggleRead: () => ref
                             .read(inboxControllerProvider.notifier)
                             .toggleRead(message),
@@ -106,14 +124,22 @@ class _MailAppShellState extends ConsumerState<MailAppShell> {
             selectedIcon: Icon(Icons.inbox),
             label: 'Inbox',
           ),
-           NavigationDestination(icon: Icon(Icons.settings_outlined), selectedIcon: Icon(Icons.settings), label: 'Paramètres'),
+           NavigationDestination(
+            icon: Icon(Icons.settings_outlined),
+            selectedIcon: Icon(Icons.settings),
+            label: 'Paramètres',
+          ),
         ],
       ),
       floatingActionButton: FloatingActionButton.extended(
          onPressed: account == null
             ? null
             : () {
-                Navigator.of(context).push(MaterialPageRoute(builder: (_) => const ComposePage()));
+                 Navigator.of(context).push(
+                  MaterialPageRoute<void>(
+                    builder: (_) => const ComposePage(),
+                  ),
+                );
               },
         icon: const Icon(Icons.edit_outlined),
         label: const Text('Composer'),
@@ -128,9 +154,9 @@ class _SettingsPage extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final account = ref.watch(selectedAccountProvider);
-      final accounts = ref.watch(accountsProvider).value ?? const [];
+    final accounts = ref.watch(accountsProvider).value ?? const [];
     final themeMode = ref.watch(themeModeProvider);
-
+ final savedContacts = ref.watch(savedContactsProvider).value ?? const [];
     return ListView(
       padding: const EdgeInsets.all(16),
       children: [
@@ -143,13 +169,25 @@ class _SettingsPage extends ConsumerWidget {
         Card(
           child: ListTile(
             title: const Text('Comptes locaux'),
-            subtitle: Text('${accounts.length} compte(s) Gmail enregistrés sur cet appareil'),
+            subtitle: Text(
+              '${accounts.length} compte(s) Gmail enregistrés sur cet appareil',
+            ),
+          ),
+        ),
+        Card(
+          child: ListTile(
+            title: const Text('Adresses enregistrées'),
+            subtitle: Text(
+              '${savedContacts.length} adresse(s) email réutilisable(s) dans la rédaction',
+            ),
           ),
         ),
         Card(
           child: const ListTile(
-            title: Text('Suppression locale'),
-            subtitle: Text('Retirer un compte dans l’application ne supprime jamais le compte Gmail réel ni les emails côté serveur.'),
+            title: Text('Suppression locale'), 
+            subtitle: Text(
+              'Retirer un compte dans l’application ne supprime jamais le compte Gmail réel ni les emails côté serveur.',
+            ),
           ),
         ),
         Card(
@@ -158,9 +196,8 @@ class _SettingsPage extends ConsumerWidget {
             title: const Text('Dark mode'),
             subtitle: const Text('Bascule entre les thèmes clair et sombre.'),
             onChanged: (value) {
-              ref.read(themeModeProvider.notifier).state = value
-                  ? ThemeMode.dark
-                  : ThemeMode.light;
+              ref.read(themeModeProvider.notifier).state =
+                  value ? ThemeMode.dark : ThemeMode.light;
             },
           ),
         ),
@@ -168,7 +205,114 @@ class _SettingsPage extends ConsumerWidget {
     );
   }
 }
+class MailMessageDetailPage extends ConsumerWidget {
+  const MailMessageDetailPage({
+    super.key,
+    required this.messageUid,
+  });
 
+  final String messageUid;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final detail = ref.watch(messageDetailProvider(messageUid));
+    final account = ref.watch(selectedAccountProvider);
+
+    return Scaffold(
+      appBar: AppBar(
+        title: const Text('Message'),
+        actions: [
+          IconButton(
+            tooltip: 'Rédiger',
+            onPressed: account == null
+                ? null
+                : () {
+                    Navigator.of(context).push(
+                      MaterialPageRoute<void>(
+                        builder: (_) => const ComposePage(),
+                      ),
+                    );
+                  },
+            icon: const Icon(Icons.edit_outlined),
+          ),
+        ],
+      ),
+      body: detail.when(
+        loading: () => const Center(child: CircularProgressIndicator()),
+        error: (error, _) => Center(child: Text('Erreur: $error')),
+        data: (message) {
+          if (message == null) {
+            return const Center(child: Text('Message introuvable.'));
+          }
+
+          final formattedDate =
+              DateFormat('dd MMM yyyy • HH:mm').format(message.date);
+
+          return ListView(
+            padding: const EdgeInsets.all(20),
+            children: [
+              Text(
+                message.subject,
+                style: Theme.of(context).textTheme.headlineSmall,
+              ),
+              const SizedBox(height: 16),
+              Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  CircleAvatar(
+                    radius: 24,
+                    child: Text(
+                      message.from.isNotEmpty
+                          ? message.from[0].toUpperCase()
+                          : '?',
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          message.from,
+                          style: Theme.of(context).textTheme.titleMedium,
+                        ),
+                        if (message.to.isNotEmpty)
+                          Padding(
+                            padding: const EdgeInsets.only(top: 4),
+                            child: Text('À : ${message.to}'),
+                          ),
+                        const SizedBox(height: 4),
+                        Text(
+                          formattedDate,
+                          style: Theme.of(context).textTheme.bodySmall,
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 24),
+              SelectableText(
+                message.body.isEmpty ? message.preview : message.body,
+                style: Theme.of(context)
+                    .textTheme
+                    .bodyLarge
+                    ?.copyWith(height: 1.5),
+              ),
+              if (message.body.isEmpty && message.preview.isNotEmpty) ...[
+                const SizedBox(height: 16),
+                Text(
+                  'Le corps complet n’était pas disponible, aperçu affiché.',
+                  style: Theme.of(context).textTheme.bodySmall,
+                ),
+              ],
+            ],
+          );
+        },
+      ),
+    );
+  }
+}
 class _EmptyState extends StatelessWidget {
   const _EmptyState({
     required this.icon,

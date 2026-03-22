@@ -77,11 +77,17 @@ class MailService {
     }
 
     final detailedMessages = await Future.wait(
-      messages.map((entry) => _fetchMessage(account, entry['id'] as String)),
+       messages.map((entry) => _fetchMessage(account, entry['id'] as String, format: 'full')),
     );
     return detailedMessages;
   }
-
+ Future<MailMessage> fetchMessageDetail(
+    MailAccount account,
+    String uid, {
+    MailMessage? fallback,
+  }) async {
+    return _fetchMessage(account, uid, format: 'full', fallback: fallback);
+  }
   Future<void> markAsRead(
     MailAccount account,
     String uid, {
@@ -138,16 +144,19 @@ class MailService {
     );
   }
 
-  Future<MailMessage> _fetchMessage(MailAccount account, String messageId) async {
+  Future<MailMessage> _fetchMessage(
+    MailAccount account,
+    String messageId, {
+    String format = 'full',
+    MailMessage? fallback,
+  }) async {
     final response = await _authorizedRequest(
       account,
       (authorizedAccount) => _httpClient.get(
         Uri.https(
           'gmail.googleapis.com',
           '/gmail/v1/users/me/messages/$messageId',
-          <String, String>{
-            'format': 'metadata',
-          },
+         <String, String>{'format': format},
         ),
         headers: _headers(authorizedAccount.accessToken),
       ),
@@ -167,22 +176,57 @@ class MailService {
       }
       return '';
     }
-
+ final body = _extractBody(payload).trim();
+    final preview = (data['snippet'] as String? ?? '').trim();
     return MailMessage(
       uid: data['id'] as String? ?? messageId,
-      subject: headerValue('Subject').trim().isEmpty ? '(Sans sujet)' : headerValue('Subject').trim(),
-      from: headerValue('From').trim().isEmpty ? 'Expéditeur inconnu' : headerValue('From').trim(),
-      preview: (data['snippet'] as String? ?? '').trim(),
+       subject: headerValue('Subject').trim().isEmpty
+          ? (fallback?.subject ?? '(Sans sujet)')
+          : headerValue('Subject').trim(),
+      from: headerValue('From').trim().isEmpty
+          ? (fallback?.from ?? 'Expéditeur inconnu')
+          : headerValue('From').trim(),
+      to: headerValue('To').trim(),
+      preview: preview.isEmpty ? (fallback?.preview ?? '') : preview,
+      body: body.isEmpty ? (fallback?.body ?? preview) : body,
       date: (() {
         final millis = int.tryParse(data['internalDate'] as String? ?? '');
         return millis == null
-            ? DateTime.now()
+           ? (fallback?.date ?? DateTime.now())
             : DateTime.fromMillisecondsSinceEpoch(millis);
       })(),
       isRead: !labelIds.contains('UNREAD'),
     );
   }
+  String _extractBody(Map<String, dynamic> payload) {
+    final body = payload['body'] as Map<String, dynamic>?;
+    final data = body?['data'] as String?;
+    if (data != null && data.isNotEmpty) {
+      return utf8.decode(base64Url.decode(base64Url.normalize(data)))
+          .replaceAll(RegExp(r'<[^>]*>'), ' ')
+          .replaceAll(RegExp(r'\s+'), ' ')
+          .trim();
+    }
 
+    final parts = (payload['parts'] as List<dynamic>? ?? const []).cast<Map<String, dynamic>>();
+    for (final part in parts) {
+      final mimeType = part['mimeType'] as String? ?? '';
+      if (mimeType == 'text/plain' || mimeType == 'text/html') {
+        final nestedBody = _extractBody(part);
+        if (nestedBody.isNotEmpty) {
+          return nestedBody;
+        }
+      }
+      final nestedParts = (part['parts'] as List<dynamic>? ?? const []).cast<Map<String, dynamic>>();
+      for (final nested in nestedParts) {
+        final nestedBody = _extractBody(nested);
+        if (nestedBody.isNotEmpty) {
+          return nestedBody;
+        }
+      }
+    }
+    return '';
+  }
   Future<http.Response> _authorizedRequest(
     MailAccount account,
     Future<http.Response> Function(MailAccount authorizedAccount) request,

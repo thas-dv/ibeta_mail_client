@@ -6,6 +6,8 @@ class MailMessage {
     required this.preview,
     required this.date,
     required this.isRead,
+     this.to = '',
+    this.body = '',
   });
 
   final String uid;
@@ -14,6 +16,8 @@ class MailMessage {
   final String preview;
   final DateTime date;
   final bool isRead;
+   final String to;
+  final String body;
 
   MailMessage copyWith({
     String? uid,
@@ -22,6 +26,8 @@ class MailMessage {
     String? preview,
     DateTime? date,
     bool? isRead,
+      String? to,
+    String? body,
   }) {
     return MailMessage(
       uid: uid ?? this.uid,
@@ -30,6 +36,8 @@ class MailMessage {
       preview: preview ?? this.preview,
       date: date ?? this.date,
       isRead: isRead ?? this.isRead,
+      to: to ?? this.to,
+      body: body ?? this.body,
     );
   }
 }

@@ -63,7 +63,9 @@ class MailService {
           type: em.ServerType.imap,
           hostname: account.imapHost,
           port: account.imapPort,
-          socketType: account.useSsl ? em.SocketType.ssl : em.SocketType.starttls,
+          socketType: account.useSsl
+              ? em.SocketType.ssl
+              : em.SocketType.starttls,
           authentication: em.Authentication.plain,
           usernameType: em.UsernameType.emailAddress,
         ),
@@ -83,10 +85,7 @@ class MailService {
     );
   }
 
-  em.OauthToken _buildOauthToken(
-    MailAccount account, {
-    int expiresIn = 3600,
-  }) {
+  em.OauthToken _buildOauthToken(MailAccount account, {int expiresIn = 3600}) {
     return em.OauthToken(
       accessToken: account.accessToken,
       refreshToken: account.refreshToken ?? '',
@@ -106,28 +105,92 @@ class MailService {
     final client = await _connect(account);
     await client.selectInbox();
 
-    final messages = await client.fetchMessages(count: pageSize, page: page + 1);
+    final messages = await client.fetchMessages(
+      count: pageSize,
+      page: page + 1,
+    );
 
-    return messages.map((message) {
-      final from = message.from?.isNotEmpty == true
-          ? (message.from!.first.email.isNotEmpty
-                ? message.from!.first.email
-                : message.from!.first.toString())
-          : 'Expéditeur inconnu';
+    return messages.map(_mapMimeMessage).toList();
+  }
 
-      final decodedSubject = (message.decodeSubject() ?? '').trim();
-      return MailMessage(
-        uid: (message.uid ?? message.sequenceId ?? 0).toString(),
-        subject: decodedSubject.isEmpty ? '(Sans sujet)' : decodedSubject,
-        from: from,
-        preview: (message.decodeTextPlainPart() ?? message.decodeTextHtmlPart() ?? '')
-            .replaceAll(RegExp(r'<[^>]*>'), ' ')
-            .replaceAll(RegExp(r'\s+'), ' ')
-            .trim(),
-        date: message.decodeDate() ?? DateTime.now(),
-        isRead: message.isSeen,
-      );
-    }).toList();
+  Future<MailMessage> fetchMessageDetail(
+    MailAccount account,
+    String uid, {
+    MailMessage? fallback,
+  }) async {
+    final client = await _connect(account);
+    await client.selectInbox();
+
+    final parsedUid = int.tryParse(uid);
+    if (parsedUid == null) {
+      return fallback ??
+          MailMessage(
+            uid: uid,
+            subject: '(Sans sujet)',
+            from: 'Expéditeur inconnu',
+            preview: '',
+            date: DateTime.now(),
+            isRead: true,
+          );
+    }
+
+    final messages = await client.fetchMessages(count: 50, page: 1);
+
+    final fetched = messages.where((m) => m.uid == parsedUid).isNotEmpty
+        ? messages.firstWhere((m) => m.uid == parsedUid)
+        : null;
+
+    if (fetched == null) {
+      return fallback ??
+          MailMessage(
+            uid: uid,
+            subject: '(Sans sujet)',
+            from: 'Expéditeur inconnu',
+            preview: '',
+            date: DateTime.now(),
+            isRead: true,
+          );
+    }
+
+    return _mapMimeMessage(fetched, fallback: fallback);
+  }
+
+  MailMessage _mapMimeMessage(em.MimeMessage message, {MailMessage? fallback}) {
+    final from = message.from?.isNotEmpty == true
+        ? (message.from!.first.email.isNotEmpty
+              ? message.from!.first.email
+              : message.from!.first.toString())
+        : (fallback?.from ?? 'Expéditeur inconnu');
+    final to = message.to?.isNotEmpty == true
+        ? message.to!
+              .map(
+                (entry) =>
+                    entry.email.isNotEmpty ? entry.email : entry.toString(),
+              )
+              .join(', ')
+        : (fallback?.to ?? '');
+    final decodedSubject = (message.decodeSubject() ?? fallback?.subject ?? '')
+        .trim();
+    final textBody = (message.decodeTextPlainPart() ?? '').trim();
+    final htmlBody = (message.decodeTextHtmlPart() ?? '')
+        .replaceAll(RegExp(r'<[^>]*>'), ' ')
+        .trim();
+    final normalizedBody = (textBody.isNotEmpty ? textBody : htmlBody)
+        .replaceAll(RegExp(r'\s+'), ' ')
+        .trim();
+
+    return MailMessage(
+      uid: (message.uid ?? message.sequenceId ?? fallback?.uid ?? 0).toString(),
+      subject: decodedSubject.isEmpty ? '(Sans sujet)' : decodedSubject,
+      from: from,
+      to: to,
+      body: normalizedBody,
+      preview: normalizedBody.isEmpty
+          ? (fallback?.preview ?? '')
+          : normalizedBody,
+      date: message.decodeDate() ?? fallback?.date ?? DateTime.now(),
+      isRead: message.isSeen,
+    );
   }
 
   Future<void> markAsRead(
@@ -144,11 +207,9 @@ class MailService {
     }
 
     final sequence = em.MessageSequence.fromId(parsedUid, isUid: true);
-    await client.store(
-      sequence,
-      <String>[em.MessageFlags.seen],
-      action: read ? em.StoreAction.add : em.StoreAction.remove,
-    );
+    await client.store(sequence, <String>[
+      em.MessageFlags.seen,
+    ], action: read ? em.StoreAction.add : em.StoreAction.remove);
   }
 
   Future<void> deleteMessage(MailAccount account, String uid) async {
@@ -183,7 +244,9 @@ class MailService {
     final client = await _connect(account);
 
     final builder = em.MessageBuilder()
-      ..from = <em.MailAddress>[em.MailAddress(account.displayName, account.email)]
+      ..from = <em.MailAddress>[
+        em.MailAddress(account.displayName, account.email),
+      ]
       ..to = <em.MailAddress>[em.MailAddress('', to)]
       ..subject = subject
       ..text = body;

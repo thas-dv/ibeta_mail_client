@@ -19,7 +19,27 @@ final mailCacheServiceProvider = Provider((ref) => MailCacheService());
 final inboxControllerProvider = AsyncNotifierProvider<InboxController, List<MailMessage>>(
   InboxController.new,
 );
+final messageDetailProvider = FutureProvider.family<MailMessage?, String>((ref, uid) async {
+  final account = ref.watch(selectedAccountProvider);
+  if (account == null) {
+    return null;
+  }
 
+  final inbox = ref.watch(inboxControllerProvider).value ?? const <MailMessage>[];
+  MailMessage? cached;
+  for (final message in inbox) {
+    if (message.uid == uid) {
+      cached = message;
+      break;
+    }
+  }
+
+  return ref.watch(mailServiceProvider).fetchMessageDetail(
+        account,
+        uid,
+        fallback: cached,
+      );
+});
 class InboxController extends AsyncNotifier<List<MailMessage>> {
   int _page = 0;
   bool _hasMore = true;
@@ -89,19 +109,27 @@ class InboxController extends AsyncNotifier<List<MailMessage>> {
     _hasMore = more.length == 20;
     state = AsyncData([...current, ...more]);
   }
+  Future<void> openMessage(MailMessage message) async {
+    if (!message.isRead) {
+      await toggleRead(message, forceRead: true);
+    }
+    ref.invalidate(messageDetailProvider(message.uid));
+  }
 
-  Future<void> toggleRead(MailMessage message) async {
+  Future<void> toggleRead(MailMessage message, {bool? forceRead}) async {
     final account = ref.read(selectedAccountProvider);
     if (account == null) {
       return;
     }
-    await ref.watch(mailServiceProvider).markAsRead(account, message.uid, read: !message.isRead);
+   final nextRead = forceRead ?? !message.isRead;
+    await ref.watch(mailServiceProvider).markAsRead(account, message.uid, read: nextRead);
     final updated = [
       for (final item in state.value ?? const <MailMessage>[])
-        if (item.uid == message.uid) item.copyWith(isRead: !item.isRead) else item,
+      if (item.uid == message.uid) item.copyWith(isRead: nextRead) else item,
     ];
-      state = AsyncData(updated);
+       state = AsyncData(updated);
     await ref.watch(mailCacheServiceProvider).saveInbox(account.id, updated);
+     ref.invalidate(messageDetailProvider(message.uid));
   }
 
   Future<void> deleteMessage(MailMessage message) async {
@@ -116,5 +144,6 @@ class InboxController extends AsyncNotifier<List<MailMessage>> {
     ];
      state = AsyncData(updated);
     await ref.watch(mailCacheServiceProvider).saveInbox(account.id, updated);
+     ref.invalidate(messageDetailProvider(message.uid));
   }
 }
